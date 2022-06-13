@@ -118,6 +118,11 @@ func (env *Env) Register(w http.ResponseWriter, r *http.Request) {
 }
 
 func (env *Env) Login(w http.ResponseWriter, r *http.Request) {
+	// sessionError := auth.CheckSession(w, r)
+	// if sessionError != 200 {
+	// 	fmt.Fprintf(w, "%v", sessionError)
+	// 	return
+	// }
 	var lc auth.LoginCredentials
 	err := json.NewDecoder(r.Body).Decode(&lc)
 	if err != nil {

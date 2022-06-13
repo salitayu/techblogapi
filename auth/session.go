@@ -1,12 +1,28 @@
 package auth
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"time"
 
+	"github.com/go-redis/redis"
 	"github.com/google/uuid"
 )
+
+func ConnectRedis() (*redis.Client, error) {
+	redisClient := redis.NewClient(&redis.Options{
+		Addr:     "localhost:6379",
+		Password: "", // No password set
+		DB:       0,  // Use default DB
+	})
+	_, err := redisClient.Ping().Result()
+	if err != nil {
+		fmt.Println(err)
+		return nil, err
+	}
+	return redisClient, nil
+}
 
 // store user session in redis
 var sessions = map[string]Session{}
@@ -32,12 +48,15 @@ func CheckSession(w http.ResponseWriter, r *http.Request) int {
 	}
 	sessionToken := c.Value
 
-	// set session token
+	// Check session token from map
+	// TODO: get session from redis here
 	userSession, exists := sessions[sessionToken]
 	if !exists {
 		// Return unauthorized error if token is not in our sessionToken map
 		return http.StatusUnauthorized
 	}
+
+	// Delete session token if expired
 	if userSession.isExpired() {
 		delete(sessions, sessionToken)
 		fmt.Fprintf(w, "%v", http.StatusUnauthorized)
@@ -57,6 +76,24 @@ func CreateSession(w http.ResponseWriter, lc LoginCredentials) {
 		Username: lc.Username,
 		Expiry:   expiresAt,
 	}
+
+	// Setting token in Redis
+	client, err := ConnectRedis()
+	if err != nil {
+		fmt.Printf("error connecting to redis %s", client)
+		// return http.StatusInternalServerError
+	}
+	json, err := json.Marshal(Session{Username: lc.Username, Expiry: expiresAt})
+	client.Set("session_token", json, 0).Err()
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	sessionTokenValue, err := client.Get("session_token").Result()
+	if err != nil {
+		fmt.Println(err)
+	}
+	fmt.Println("session_token from redis is: ", sessionTokenValue)
 
 	// Set the client cookie for "session_token" as the session token generated and expiry of 120s
 	http.SetCookie(w, &http.Cookie{
