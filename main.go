@@ -38,7 +38,6 @@ func main() {
 		log.Fatal(err)
 	}
 	conn := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=disable", host, newport, user, pass, dbname)
-	fmt.Println(conn)
 	db, err := sql.Open("postgres", conn)
 	if err != nil {
 		log.Fatal(err)
