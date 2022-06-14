@@ -52,7 +52,7 @@ func main() {
 	// Initialize Env with models.BlogModel that wraps connection pool
 	env := &Env{
 		blog:            models.BlogModel{DB: db},
-		redisConnection: *redisConn,
+		redisConnection: auth.RedisClient{Connection: redisConn},
 	}
 
 	http.HandleFunc("/", env.Handle)
@@ -60,12 +60,12 @@ func main() {
 	http.HandleFunc("/login", env.Login)
 	http.HandleFunc("/categories", env.GetCategories)
 	http.HandleFunc("/posts", env.GetPosts)
-	http.HandleFunc("/logout", Logout)
+	http.HandleFunc("/logout", env.Logout)
 	log.Fatal(http.ListenAndServe(":8080", nil))
 }
 
 func (env *Env) Handle(w http.ResponseWriter, r *http.Request) {
-	loggedIn := auth.CheckSession(w, r, &env.redisConnection)
+	loggedIn := env.redisConnection.CheckSession(w, r)
 	if loggedIn != http.StatusOK {
 		return
 	}
@@ -74,7 +74,7 @@ func (env *Env) Handle(w http.ResponseWriter, r *http.Request) {
 }
 
 func (env *Env) GetCategories(w http.ResponseWriter, r *http.Request) {
-	loggedIn := auth.CheckSession(w, r, &env.redisConnection)
+	loggedIn := env.redisConnection.CheckSession(w, r)
 	if loggedIn != http.StatusOK {
 		return
 	}
@@ -91,7 +91,7 @@ func (env *Env) GetCategories(w http.ResponseWriter, r *http.Request) {
 }
 
 func (env *Env) GetPosts(w http.ResponseWriter, r *http.Request) {
-	loggedIn := auth.CheckSession(w, r, &env.redisConnection)
+	loggedIn := env.redisConnection.CheckSession(w, r)
 	if loggedIn != http.StatusOK {
 		return
 	}
@@ -125,11 +125,6 @@ func (env *Env) Register(w http.ResponseWriter, r *http.Request) {
 }
 
 func (env *Env) Login(w http.ResponseWriter, r *http.Request) {
-	// sessionError := auth.CheckSession(w, r)
-	// if sessionError != 200 {
-	// 	fmt.Fprintf(w, "%v", sessionError)
-	// 	return
-	// }
 	var lc auth.LoginCredentials
 	err := json.NewDecoder(r.Body).Decode(&lc)
 	if err != nil {
@@ -144,7 +139,7 @@ func (env *Env) Login(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if loginSuccessful {
-		auth.CreateSession(w, lc, &env.redisConnection)
+		env.redisConnection.CreateSession(w, lc)
 		fmt.Fprintf(w, "Logged in %t", loginSuccessful)
 	} else {
 		http.SetCookie(w, &http.Cookie{
@@ -156,10 +151,10 @@ func (env *Env) Login(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// func Refresh(w http.ResponseWriter, r *http.Request) {
-// 	auth.RefreshSession(w, r)
-// }
+func (env *Env) Refresh(w http.ResponseWriter, r *http.Request) {
+	env.redisConnection.RefreshSession(w, r)
+}
 
-func Logout(w http.ResponseWriter, r *http.Request) {
-	auth.RemoveSession(w, r)
+func (env *Env) Logout(w http.ResponseWriter, r *http.Request) {
+	env.redisConnection.RemoveSession(w, r)
 }

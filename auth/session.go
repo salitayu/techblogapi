@@ -14,7 +14,7 @@ type RedisClient struct {
 	Connection *redis.Client
 }
 
-func ConnectRedis() (*RedisClient, error) {
+func ConnectRedis() (*redis.Client, error) {
 	redisClient := redis.NewClient(&redis.Options{
 		Addr:     "localhost:6379",
 		Password: "", // No password set
@@ -27,7 +27,7 @@ func ConnectRedis() (*RedisClient, error) {
 	}
 	fmt.Println("redis connection with message: ", ping)
 
-	return &RedisClient{Connection: redisClient}, nil
+	return redisClient, nil
 }
 
 // struct to store user session in redis
@@ -40,7 +40,7 @@ func (s Session) isExpired() bool {
 	return s.Expiry.Before(time.Now())
 }
 
-func CheckSession(w http.ResponseWriter, r *http.Request, redisClient *RedisClient) int {
+func (redisClient *RedisClient) CheckSession(w http.ResponseWriter, r *http.Request) int {
 	// Get session_token from request cookies
 	c, err := r.Cookie("session_token")
 	if err != nil {
@@ -78,7 +78,7 @@ func CheckSession(w http.ResponseWriter, r *http.Request, redisClient *RedisClie
 	return http.StatusOK
 }
 
-func CreateSession(w http.ResponseWriter, lc LoginCredentials, redisClient *RedisClient) {
+func (redisClient *RedisClient) CreateSession(w http.ResponseWriter, lc LoginCredentials) {
 	// Create new random session token using uuid
 	sessionToken := uuid.NewString()
 	expiresAt := time.Now().Add(3600 * time.Second)
@@ -104,51 +104,53 @@ func CreateSession(w http.ResponseWriter, lc LoginCredentials, redisClient *Redi
 	})
 }
 
-// func RefreshSession(w http.ResponseWriter, r *http.Request) {
-// 	c, err := r.Cookie("session_token")
-// 	if err != nil {
-// 		if err == http.ErrNoCookie {
-// 			w.WriteHeader(http.StatusUnauthorized)
-// 			return
-// 		}
-// 		w.WriteHeader(http.StatusBadRequest)
-// 		return
-// 	}
-// 	sessionToken := c.Value
+func (redisClient *RedisClient) RefreshSession(w http.ResponseWriter, r *http.Request) {
+	c, err := r.Cookie("session_token")
+	if err != nil {
+		if err == http.ErrNoCookie {
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	sessionToken := c.Value
 
-// 	userSession, exists := sessions[sessionToken]
-// 	if !exists {
-// 		w.WriteHeader(http.StatusUnauthorized)
-// 		return
-// 	}
-// 	if userSession.isExpired() {
-// 		delete(sessions, sessionToken)
-// 		w.WriteHeader(http.StatusUnauthorized)
-// 		return
-// 	}
+	sessionTokenValue, err := redisClient.Connection.Get("session").Result()
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	jsonMap := Session{}
+	json.Unmarshal([]byte(sessionTokenValue), &jsonMap)
+	if sessionToken != jsonMap.Username {
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
 
-// 	// Create new session for current user if session is valid
-// 	newSessionToken := uuid.NewString()
-// 	expiresAt := time.Now().Add(120 * time.Second)
+	// Create new session for current user if session is valid
+	newSessionToken := uuid.NewString()
+	expiresAt := time.Now().Add(3600 * time.Second)
 
-// 	// Set new session token in map
-// 	sessions[newSessionToken] = Session{
-// 		Username: userSession.Username,
-// 		Expiry:   expiresAt,
-// 	}
+	newSessionTokenString, err := json.Marshal(Session{Username: newSessionToken, Expiry: expiresAt})
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	redisClient.Connection.Set("session_token", newSessionTokenString, 0).Err()
 
-// 	// Delete previous session
-// 	delete(sessions, sessionToken)
+	// Delete previous session
+	// delete(sessions, sessionToken)
 
-// 	// Set new token as user's session_token cookie
-// 	http.SetCookie(w, &http.Cookie{
-// 		Name:    "session_token",
-// 		Value:   newSessionToken,
-// 		Expires: time.Now().Add(120 * time.Second),
-// 	})
-// }
+	// Set new token as user's session_token cookie
+	http.SetCookie(w, &http.Cookie{
+		Name:    "session_token",
+		Value:   newSessionToken,
+		Expires: time.Now().Add(3600 * time.Second),
+	})
+}
 
-func RemoveSession(w http.ResponseWriter, r *http.Request) {
+func (redisClient *RedisClient) RemoveSession(w http.ResponseWriter, r *http.Request) {
 	c, err := r.Cookie("session_token")
 	if err != nil {
 		if err == http.ErrNoCookie {
