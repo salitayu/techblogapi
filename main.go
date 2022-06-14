@@ -18,7 +18,8 @@ import (
 
 // Make models.BlogModel the dependency in Env
 type Env struct {
-	blog models.BlogModel
+	blog            models.BlogModel
+	redisConnection auth.RedisClient
 }
 
 func main() {
@@ -43,12 +44,18 @@ func main() {
 		log.Fatal(err)
 	}
 
-	// Initialize Env with models.BlogModel that wraps connection pool
-	env := &Env{
-		blog: models.BlogModel{DB: db},
+	redisConn, err := auth.ConnectRedis()
+	if err != nil {
+		panic(err)
 	}
 
-	http.HandleFunc("/", Handle)
+	// Initialize Env with models.BlogModel that wraps connection pool
+	env := &Env{
+		blog:            models.BlogModel{DB: db},
+		redisConnection: *redisConn,
+	}
+
+	http.HandleFunc("/", env.Handle)
 	http.HandleFunc("/register", env.Register)
 	http.HandleFunc("/login", env.Login)
 	http.HandleFunc("/categories", env.GetCategories)
@@ -57,8 +64,8 @@ func main() {
 	log.Fatal(http.ListenAndServe(":8080", nil))
 }
 
-func Handle(w http.ResponseWriter, r *http.Request) {
-	loggedIn := auth.CheckSession(w, r)
+func (env *Env) Handle(w http.ResponseWriter, r *http.Request) {
+	loggedIn := auth.CheckSession(w, r, &env.redisConnection)
 	if loggedIn != http.StatusOK {
 		return
 	}
@@ -67,7 +74,7 @@ func Handle(w http.ResponseWriter, r *http.Request) {
 }
 
 func (env *Env) GetCategories(w http.ResponseWriter, r *http.Request) {
-	loggedIn := auth.CheckSession(w, r)
+	loggedIn := auth.CheckSession(w, r, &env.redisConnection)
 	if loggedIn != http.StatusOK {
 		return
 	}
@@ -84,7 +91,7 @@ func (env *Env) GetCategories(w http.ResponseWriter, r *http.Request) {
 }
 
 func (env *Env) GetPosts(w http.ResponseWriter, r *http.Request) {
-	loggedIn := auth.CheckSession(w, r)
+	loggedIn := auth.CheckSession(w, r, &env.redisConnection)
 	if loggedIn != http.StatusOK {
 		return
 	}
@@ -137,7 +144,7 @@ func (env *Env) Login(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if loginSuccessful {
-		auth.CreateSession(w, lc)
+		auth.CreateSession(w, lc, &env.redisConnection)
 		fmt.Fprintf(w, "Logged in %t", loginSuccessful)
 	} else {
 		http.SetCookie(w, &http.Cookie{
@@ -149,9 +156,9 @@ func (env *Env) Login(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func Refresh(w http.ResponseWriter, r *http.Request) {
-	auth.RefreshSession(w, r)
-}
+// func Refresh(w http.ResponseWriter, r *http.Request) {
+// 	auth.RefreshSession(w, r)
+// }
 
 func Logout(w http.ResponseWriter, r *http.Request) {
 	auth.RemoveSession(w, r)
