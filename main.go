@@ -57,25 +57,44 @@ func main() {
 	}
 
 	r := mux.NewRouter()
+
 	r.HandleFunc("/", env.Handle).Methods("GET")
 	r.HandleFunc("/register", env.Register).Methods("POST")
 	r.HandleFunc("/login", env.Login).Methods("POST")
+
 	r.HandleFunc("/categories", env.GetCategories).Methods("GET")
+	r.HandleFunc("/categories/id/{id}", env.GetCategoryByID).Methods("GET")
+	r.HandleFunc("/categories/name/{name}", env.GetIDForCategory).Methods("GET")
 	r.HandleFunc("/category", env.InsertCategory).Methods("POST")
+	// r.HandleFunc("/categories", env.BulkInsertCategories).Methods("POST")
 	r.HandleFunc("/category/{id}", env.EditCategory).Methods("PUT")
 	r.HandleFunc("/category/{id}", env.DeleteCategory).Methods("DELETE")
+
 	r.HandleFunc("/posts", env.GetPosts).Methods("GET")
+	// r.HandleFunc("/posts/{id}", env.GetPostsByCategoryId).Methods("GET")
+	// r.HandleFunc("/post/{id}", env.GetPostById).Methods("GET")
 	r.HandleFunc("/post", env.InsertPost).Methods("POST")
+	// r.HandleFunc("/posts", env.BulkInsertPosts).Methods("POST")
 	r.HandleFunc("/post/{id}", env.EditPost).Methods("PUT")
 	r.HandleFunc("/post/{id}", env.DeletePost).Methods("DELETE")
+
 	r.HandleFunc("/comments", env.GetComments).Methods("GET")
+	// r.HandleFunc("/comments/post/{postid}", env.GetCommentsByPostId).Methods("GET")
+	// r.HandleFunc("/comments/user/{userid}", env.GetPostByUserId).Methods("GET")
 	r.HandleFunc("/comment", env.InsertComment).Methods("POST")
+	// r.HandleFunc("/comments/post/{id}", env.BulkInsertComments).Methods("POST")
 	r.HandleFunc("/comment/{id}", env.EditComment).Methods("EDIT")
 	r.HandleFunc("/comment/{id}", env.DeleteComment).Methods("DELETE")
-	r.HandleFunc("/images", env.GetComments).Methods("GET")
-	r.HandleFunc("/image", env.InsertComment).Methods("POST")
-	r.HandleFunc("/image/{id}", env.EditComment).Methods("EDIT")
-	r.HandleFunc("/image/{id}", env.DeleteComment).Methods("DELETE")
+	// r.HandleFunc("/comments/post/{id}", env.DeleteCommentsByPostId).Methods("DELETE")
+
+	// r.HandleFunc("/images", env.GetImages).Methods("GET")
+	// r.HandleFunc("/images/post/{postid}", env.GetImagesByPostId).Methods("GET")
+	// r.HandleFunc("/image", env.InsertImage).Methods("POST")
+	// r.HandleFunc("/images/post/{id}", env.BulkInsertImages).Methods("POST")
+	// r.HandleFunc("/image/{id}", env.EditImage).Methods("EDIT")
+	// r.HandleFunc("/image/{id}", env.DeleteImage).Methods("DELETE")
+	// r.HandleFunc("/image/post/{id}", env.DeleteImageByPostId).Methods("DELETE")
+
 	r.HandleFunc("/logout", env.Logout).Methods("POST")
 	http.Handle("/", r)
 	log.Fatal(http.ListenAndServe(":8080", nil))
@@ -113,9 +132,42 @@ func (env *Env) GetCategories(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, http.StatusText(500), 500)
 		return
 	}
-	json.NewEncoder(w).Encode(map[string][]models.CategoryList{"results": categories})
+	json.NewEncoder(w).Encode(map[string][]models.Category{"results": categories})
 }
 
+func (env *Env) GetCategoryByID(w http.ResponseWriter, r *http.Request) {
+	responseCode := env.HandleCheck(w, r)
+	if responseCode != http.StatusOK {
+		return
+	}
+	vars := mux.Vars(r)
+	id, err := strconv.Atoi(vars["id"])
+	if err != nil {
+		return
+	}
+	fmt.Println("id ", id)
+	category, err := env.blog.GetCatByID(id)
+	if err != nil {
+		fmt.Fprintf(w, "%s", err)
+		return
+	}
+	fmt.Println("categoryByID ", category)
+	json.NewEncoder(w).Encode(category)
+}
+
+func (env *Env) GetIDForCategory(w http.ResponseWriter, r *http.Request) {
+	responseCode := env.HandleCheck(w, r)
+	if responseCode != http.StatusOK {
+		return
+	}
+	vars := mux.Vars(r)
+	name := vars["name"]
+	id, err := env.blog.GetCatIDByName(name)
+	if err != nil {
+		return
+	}
+	json.NewEncoder(w).Encode(map[string]int{"category_id": id})
+}
 func (env *Env) InsertCategory(w http.ResponseWriter, r *http.Request) {
 	responseCode := env.HandleCheck(w, r)
 	if responseCode != http.StatusOK {
@@ -227,49 +279,49 @@ func (env *Env) GetComments(w http.ResponseWriter, r *http.Request) {
 }
 
 func (env *Env) InsertComment(w http.ResponseWriter, r *http.Request) {
-	// responseCode := env.HandleCheck(w, r)
-	// if responseCode != http.StatusOK {
-	// 	return
-	// }
-	// var c models.Comment
-	// err := json.NewDecoder(r.Body).Decode(&c)
-	// if err != nil {
-	// 	fmt.Fprintf(w, "%s", err)
-	// 	return
-	// }
-	// env.blog.AddComment(c)
+	responseCode := env.HandleCheck(w, r)
+	if responseCode != http.StatusOK {
+		return
+	}
+	var c models.Comment
+	err := json.NewDecoder(r.Body).Decode(&c)
+	if err != nil {
+		fmt.Fprintf(w, "%s", err)
+		return
+	}
+	env.blog.AddComment(c)
 }
 
 func (env *Env) EditComment(w http.ResponseWriter, r *http.Request) {
-	// responseCode := env.HandleCheck(w, r)
-	// if responseCode != http.StatusOK {
-	// 	return
-	// }
-	// vars := mux.Vars(r)
-	// w.WriteHeader(http.StatusOK)
-	// fmt.Fprintf(w, "Post Id: %v\n", vars["id"])
-	// postid, err := strconv.Atoi(vars["id"])
-	// if err != nil {
-	// 	return
-	// }
-	// newpost := models.Post{}
-	// json.NewDecoder(r.Body).Decode(newpost)
-	// env.blog.PutComment(postid, newpost)
+	responseCode := env.HandleCheck(w, r)
+	if responseCode != http.StatusOK {
+		return
+	}
+	vars := mux.Vars(r)
+	w.WriteHeader(http.StatusOK)
+	fmt.Fprintf(w, "Post Id: %v\n", vars["id"])
+	postid, err := strconv.Atoi(vars["id"])
+	if err != nil {
+		return
+	}
+	newcomment := models.Comment{}
+	json.NewDecoder(r.Body).Decode(&newcomment)
+	env.blog.PutComment(postid, newcomment)
 }
 
 func (env *Env) DeleteComment(w http.ResponseWriter, r *http.Request) {
-	// responseCode := env.HandleCheck(w, r)
-	// if responseCode != http.StatusOK {
-	// 	return
-	// }
-	// vars := mux.Vars(r)
-	// w.WriteHeader(http.StatusOK)
-	// fmt.Fprintf(w, "Post Id: %v\n", vars["id"])
-	// postid, err := strconv.Atoi(vars["id"])
-	// if err != nil {
-	// 	return
-	// }
-	// env.blog.DelComment(postid)
+	responseCode := env.HandleCheck(w, r)
+	if responseCode != http.StatusOK {
+		return
+	}
+	vars := mux.Vars(r)
+	w.WriteHeader(http.StatusOK)
+	fmt.Fprintf(w, "Comment Id: %v\n", vars["id"])
+	commentid, err := strconv.Atoi(vars["id"])
+	if err != nil {
+		return
+	}
+	env.blog.DelComment(commentid)
 }
 
 func (env *Env) Register(w http.ResponseWriter, r *http.Request) {
@@ -295,12 +347,14 @@ func (env *Env) Login(w http.ResponseWriter, r *http.Request) {
 	err := json.NewDecoder(r.Body).Decode(&lc)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
+		fmt.Fprintf(w, "Bad Request")
 		return
 	}
 	loginSuccessful, err := env.blog.Login(lc)
 
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
+		fmt.Fprintf(w, "Internal Server Error")
 		return
 	}
 

@@ -47,4 +47,7 @@ CREATE TABLE IF NOT EXISTS comment (
 	CONSTRAINT fk_user_comment FOREIGN KEY(user_id) REFERENCES users(id)
 );
 
+ALTER TABLE comment ADD COLUMN post_id INT NOT NULL;
+ALTER TABLE comment ADD CONSTRAINT fk_post_comment FOREIGN KEY(post_id) REFERENCES post(id);
+
 INSERT INTO category(category_name) VALUES('Web Development'), ('Algorithms and Data Structures'), ('New Technologies');

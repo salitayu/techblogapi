@@ -23,11 +23,7 @@ type User struct {
 }
 
 type Category struct {
-	CategoryName string `json:"category_name" db:"category_name"`
-}
-
-type CategoryList struct {
-	CategoryID   int64  `json:"category_id" db:"id"`
+	CategoryID   int64  `json:"category_id,omitempty" db:"id"`
 	CategoryName string `json:"category_name" db:"category_name"`
 }
 
@@ -42,16 +38,23 @@ type Post struct {
 	DateTime   time.Time `json:"date_time" db:"datetime"`
 }
 
+type Comment struct {
+	CommentID int64  `json:"comment_id,omitempty" db:"id"`
+	UserID    int64  `json:"user_id" db:"user_id"`
+	Message   string `json:"message" db:"message"`
+	PostID    int64  `json:"post_id" db:"post_id"`
+}
+
 // Use a method on the custom BlogModel type to run the SQL query.
-func (m BlogModel) AllCategories() ([]CategoryList, error) {
+func (m BlogModel) AllCategories() ([]Category, error) {
 	rows, err := m.DB.Query("SELECT * FROM category;")
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var categories []CategoryList
+	var categories []Category
 	for rows.Next() {
-		var category CategoryList
+		var category Category
 		err := rows.Scan(&category.CategoryID, &category.CategoryName)
 		if err != nil {
 			return nil, err
@@ -62,6 +65,40 @@ func (m BlogModel) AllCategories() ([]CategoryList, error) {
 		return nil, err
 	}
 	return categories, nil
+}
+
+func (m BlogModel) GetCatByID(id int) (string, error) {
+	category := Category{}
+	rows, err := m.DB.Query("SELECT category_name FROM category WHERE id = $1", id)
+	if err != nil {
+		fmt.Println(err)
+		return "", err
+	}
+	for rows.Next() {
+		err := rows.Scan(&category.CategoryName)
+		if err != nil {
+			fmt.Println(err)
+			return "", err
+		}
+	}
+	return category.CategoryName, nil
+}
+
+func (m BlogModel) GetCatIDByName(name string) (int, error) {
+	id := -1
+	rows, err := m.DB.Query("SELECT id FROM category WHERE category_name = $1", name)
+	if err != nil {
+		fmt.Println(err)
+		return id, err
+	}
+	for rows.Next() {
+		err := rows.Scan(&id)
+		if err != nil {
+			fmt.Println(err)
+			return id, err
+		}
+	}
+	return id, nil
 }
 
 func (m BlogModel) AllPosts() ([]Post, error) {
@@ -97,6 +134,9 @@ func (m BlogModel) Register(u User) (bool, error) {
 
 	// Generate Hash for Password
 	encodedHash, err := auth.GenerateFromPassword(u.Password, p)
+	if err != nil {
+		return false, err
+	}
 	_, err = m.DB.Exec("INSERT INTO users (is_guest, is_superuser, username, firstname, lastname, email, password) VALUES ($1, $2, $3, $4, $5, $6, $7)",
 		u.IsGuest,
 		u.IsSuperuser,
@@ -180,22 +220,48 @@ func (m BlogModel) DelPost(postid int) (bool, error) {
 	return true, nil
 }
 
-func (m BlogModel) AllComments() (bool, error) {
+func (m BlogModel) AllComments() ([]Comment, error) {
 	rows, err := m.DB.Query("SELECT * FROM comment")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var comments []Comment
+	for rows.Next() {
+		var comment Comment
+		err := rows.Scan(&comment.CommentID, &comment.UserID, &comment.PostID, &comment.Message)
+		if err != nil {
+			return nil, err
+		}
+		comments = append(comments, comment)
+	}
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+	return comments, nil
+}
+
+func (m BlogModel) AddComment(c Comment) (bool, error) {
+	_, err := m.DB.Exec("INSERT INTO comment(user_id, post_id, message) VALUES($1, $2, $3)", c.UserID, c.PostID, c.Message)
+	if err != nil {
+		fmt.Println(err)
+		return false, err
+	}
+	return true, nil
+}
+
+func (m BlogModel) PutComment(postid int, c Comment) (bool, error) {
+	_, err := m.DB.Exec("UPDATE comment SET user_id = $1, message = $2, post_id = $3",
+		c.UserID, c.PostID, c.Message)
 	if err != nil {
 		return false, err
 	}
-	defer rows.Close()
-	var categories []CategoryList
-	for rows.Next() {
-		var category CategoryList
-		err := rows.Scan(&category.CategoryID, &category.CategoryName)
-		if err != nil {
-			return false, err
-		}
-		categories = append(categories, category)
-	}
-	if err = rows.Err(); err != nil {
+	return true, nil
+}
+
+func (m BlogModel) DelComment(commentid int) (bool, error) {
+	_, err := m.DB.Exec("DELETE FROM comment WHERE id = $1", commentid)
+	if err != nil {
 		return false, err
 	}
 	return true, nil
