@@ -29,6 +29,8 @@ CREATE TABLE IF NOT EXISTS post (
 	CONSTRAINT fk_category_post FOREIGN KEY(category_id) REFERENCES category(id)
 );
 
+ALTER TABLE post ALTER COLUMN read_time TYPE INT;
+
 CREATE TABLE IF NOT EXISTS image (
 	id SERIAL PRIMARY KEY,
 	image_url VARCHAR(254) NOT NULL,

@@ -12,14 +12,15 @@ import (
 	"techblogapi/models"
 	"time"
 
+	"github.com/gorilla/mux"
 	"github.com/joho/godotenv"
 	_ "github.com/lib/pq"
 )
 
 // Make models.BlogModel the dependency in Env
 type Env struct {
-	blog            models.BlogModel
-	redisConnection auth.RedisClient
+	blog  models.BlogModel
+	cache auth.RedisClient
 }
 
 func main() {
@@ -51,31 +52,58 @@ func main() {
 
 	// Initialize Env with models.BlogModel that wraps connection pool
 	env := &Env{
-		blog:            models.BlogModel{DB: db},
-		redisConnection: auth.RedisClient{Connection: redisConn},
+		blog:  models.BlogModel{DB: db},
+		cache: auth.RedisClient{Connection: redisConn},
 	}
 
-	http.HandleFunc("/", env.Handle)
-	http.HandleFunc("/register", env.Register)
-	http.HandleFunc("/login", env.Login)
-	http.HandleFunc("/categories", env.GetCategories)
-	http.HandleFunc("/posts", env.GetPosts)
-	http.HandleFunc("/logout", env.Logout)
+	r := mux.NewRouter()
+	r.HandleFunc("/", env.Handle).Methods("GET")
+	r.HandleFunc("/register", env.Register).Methods("POST")
+	r.HandleFunc("/login", env.Login).Methods("POST")
+	r.HandleFunc("/categories", env.GetCategories).Methods("GET")
+	r.HandleFunc("/category", env.InsertCategory).Methods("POST")
+	r.HandleFunc("/category/{id}", env.EditCategory).Methods("PUT")
+	r.HandleFunc("/category/{id}", env.DeleteCategory).Methods("DELETE")
+	r.HandleFunc("/posts", env.GetPosts).Methods("GET")
+	r.HandleFunc("/post", env.InsertPost).Methods("POST")
+	r.HandleFunc("/post/{id}", env.EditPost).Methods("PUT")
+	r.HandleFunc("/post/{id}", env.DeletePost).Methods("DELETE")
+	r.HandleFunc("/comments", env.GetComments).Methods("GET")
+	r.HandleFunc("/comment", env.InsertComment).Methods("POST")
+	r.HandleFunc("/comment/{id}", env.EditComment).Methods("EDIT")
+	r.HandleFunc("/comment/{id}", env.DeleteComment).Methods("DELETE")
+	r.HandleFunc("/images", env.GetComments).Methods("GET")
+	r.HandleFunc("/image", env.InsertComment).Methods("POST")
+	r.HandleFunc("/image/{id}", env.EditComment).Methods("EDIT")
+	r.HandleFunc("/image/{id}", env.DeleteComment).Methods("DELETE")
+	r.HandleFunc("/logout", env.Logout).Methods("POST")
+	http.Handle("/", r)
 	log.Fatal(http.ListenAndServe(":8080", nil))
 }
 
-func (env *Env) Handle(w http.ResponseWriter, r *http.Request) {
-	loggedIn := env.redisConnection.CheckSession(w, r)
+func (env *Env) HandleCheck(w http.ResponseWriter, r *http.Request) int {
+	loggedIn := env.cache.CheckSession(w, r)
 	if loggedIn != http.StatusOK {
+		response := map[string]int{"Login returned code": loggedIn}
+		json.NewEncoder(w).Encode(response)
+		return loggedIn
+	}
+	return loggedIn
+}
+
+func (env *Env) Handle(w http.ResponseWriter, r *http.Request) {
+	responseCode := env.HandleCheck(w, r)
+	if responseCode != http.StatusOK {
 		return
 	}
-	var name string = "Sally"
-	fmt.Fprintf(w, "Hi, my name is %s. Welcome to my tech blog :)", name)
+	env.HandleCheck(w, r)
+	welcomeResponse := map[string]string{"message": "Hi, my name is Sally. Welcome to my tech blog :)"}
+	json.NewEncoder(w).Encode(welcomeResponse)
 }
 
 func (env *Env) GetCategories(w http.ResponseWriter, r *http.Request) {
-	loggedIn := env.redisConnection.CheckSession(w, r)
-	if loggedIn != http.StatusOK {
+	responseCode := env.HandleCheck(w, r)
+	if responseCode != http.StatusOK {
 		return
 	}
 	// Execute the SQL query by calling the AllCategoriesMethod() from env.blog
@@ -85,14 +113,50 @@ func (env *Env) GetCategories(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, http.StatusText(500), 500)
 		return
 	}
-	for i, category := range categories {
-		fmt.Fprintf(w, "%v, %v, %s", i, category.CategoryID, category.CategoryName)
+	json.NewEncoder(w).Encode(map[string][]models.CategoryList{"results": categories})
+}
+
+func (env *Env) InsertCategory(w http.ResponseWriter, r *http.Request) {
+	responseCode := env.HandleCheck(w, r)
+	if responseCode != http.StatusOK {
+		return
 	}
+	var c models.Category
+	err := json.NewDecoder(r.Body).Decode(&c)
+	if err != nil {
+		fmt.Fprintf(w, "%s", err)
+		return
+	}
+	env.blog.AddCategory(c)
+}
+
+func (env *Env) EditCategory(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	w.WriteHeader(http.StatusOK)
+	fmt.Fprintf(w, "Category Id: %v\n", vars["id"])
+	categoryId, err := strconv.Atoi(vars["id"])
+	if err != nil {
+		return
+	}
+	category := models.Category{}
+	json.NewDecoder(r.Body).Decode(&category)
+	env.blog.PutCategory(categoryId, category.CategoryName)
+}
+
+func (env *Env) DeleteCategory(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	w.WriteHeader(http.StatusOK)
+	fmt.Fprintf(w, "Category Id: %v\n", vars["id"])
+	categoryId, err := strconv.Atoi(vars["id"])
+	if err != nil {
+		return
+	}
+	env.blog.DeleteCategory(categoryId)
 }
 
 func (env *Env) GetPosts(w http.ResponseWriter, r *http.Request) {
-	loggedIn := env.redisConnection.CheckSession(w, r)
-	if loggedIn != http.StatusOK {
+	responseCode := env.HandleCheck(w, r)
+	if responseCode != http.StatusOK {
 		return
 	}
 	posts, err := env.blog.AllPosts()
@@ -102,8 +166,110 @@ func (env *Env) GetPosts(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	for i, post := range posts {
-		fmt.Fprintf(w, "%v, %s", i, post.PostMessage)
+		fmt.Fprintf(w, "%v, %s", i, post.Message)
 	}
+}
+
+func (env *Env) InsertPost(w http.ResponseWriter, r *http.Request) {
+	responseCode := env.HandleCheck(w, r)
+	if responseCode != http.StatusOK {
+		return
+	}
+	post := models.Post{}
+	err := json.NewDecoder(r.Body).Decode(&post)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+	}
+	_, err = env.blog.AddPost(post)
+	if err != nil {
+		return
+	}
+}
+
+func (env *Env) EditPost(w http.ResponseWriter, r *http.Request) {
+	responseCode := env.HandleCheck(w, r)
+	if responseCode != http.StatusOK {
+		return
+	}
+	vars := mux.Vars(r)
+	w.WriteHeader(http.StatusOK)
+	fmt.Fprintf(w, "Post Id: %v\n", vars["id"])
+	postid, err := strconv.Atoi(vars["id"])
+	if err != nil {
+		return
+	}
+	newpost := models.Post{}
+	json.NewDecoder(r.Body).Decode(&newpost)
+	env.blog.PutPost(postid, newpost)
+}
+
+func (env *Env) DeletePost(w http.ResponseWriter, r *http.Request) {
+	responseCode := env.HandleCheck(w, r)
+	if responseCode != http.StatusOK {
+		return
+	}
+	vars := mux.Vars(r)
+	w.WriteHeader(http.StatusOK)
+	fmt.Fprintf(w, "Post Id: %v\n", vars["id"])
+	postid, err := strconv.Atoi(vars["id"])
+	if err != nil {
+		return
+	}
+	env.blog.DelPost(postid)
+}
+
+func (env *Env) GetComments(w http.ResponseWriter, r *http.Request) {
+	responseCode := env.HandleCheck(w, r)
+	if responseCode != http.StatusOK {
+		return
+	}
+	env.blog.AllComments()
+}
+
+func (env *Env) InsertComment(w http.ResponseWriter, r *http.Request) {
+	// responseCode := env.HandleCheck(w, r)
+	// if responseCode != http.StatusOK {
+	// 	return
+	// }
+	// var c models.Comment
+	// err := json.NewDecoder(r.Body).Decode(&c)
+	// if err != nil {
+	// 	fmt.Fprintf(w, "%s", err)
+	// 	return
+	// }
+	// env.blog.AddComment(c)
+}
+
+func (env *Env) EditComment(w http.ResponseWriter, r *http.Request) {
+	// responseCode := env.HandleCheck(w, r)
+	// if responseCode != http.StatusOK {
+	// 	return
+	// }
+	// vars := mux.Vars(r)
+	// w.WriteHeader(http.StatusOK)
+	// fmt.Fprintf(w, "Post Id: %v\n", vars["id"])
+	// postid, err := strconv.Atoi(vars["id"])
+	// if err != nil {
+	// 	return
+	// }
+	// newpost := models.Post{}
+	// json.NewDecoder(r.Body).Decode(newpost)
+	// env.blog.PutComment(postid, newpost)
+}
+
+func (env *Env) DeleteComment(w http.ResponseWriter, r *http.Request) {
+	// responseCode := env.HandleCheck(w, r)
+	// if responseCode != http.StatusOK {
+	// 	return
+	// }
+	// vars := mux.Vars(r)
+	// w.WriteHeader(http.StatusOK)
+	// fmt.Fprintf(w, "Post Id: %v\n", vars["id"])
+	// postid, err := strconv.Atoi(vars["id"])
+	// if err != nil {
+	// 	return
+	// }
+	// env.blog.DelComment(postid)
 }
 
 func (env *Env) Register(w http.ResponseWriter, r *http.Request) {
@@ -139,7 +305,7 @@ func (env *Env) Login(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if loginSuccessful {
-		env.redisConnection.CreateSession(w, lc)
+		env.cache.CreateSession(w, lc)
 		fmt.Fprintf(w, "Logged in %t", loginSuccessful)
 	} else {
 		http.SetCookie(w, &http.Cookie{
@@ -152,9 +318,13 @@ func (env *Env) Login(w http.ResponseWriter, r *http.Request) {
 }
 
 func (env *Env) Refresh(w http.ResponseWriter, r *http.Request) {
-	env.redisConnection.RefreshSession(w, r)
+	env.cache.RefreshSession(w, r)
 }
 
 func (env *Env) Logout(w http.ResponseWriter, r *http.Request) {
-	env.redisConnection.RemoveSession(w, r)
+	responseCode := env.HandleCheck(w, r)
+	if responseCode != http.StatusOK {
+		return
+	}
+	env.cache.RemoveSession(w, r)
 }

@@ -2,7 +2,9 @@ package models
 
 import (
 	"database/sql"
+	"fmt"
 	"techblogapi/auth"
+	"time"
 )
 
 // Create customer BlogModel type which wraps the sql.DB connection pool
@@ -21,25 +23,35 @@ type User struct {
 }
 
 type Category struct {
-	CategoryID   int64
-	CategoryName string
+	CategoryName string `json:"category_name" db:"category_name"`
+}
+
+type CategoryList struct {
+	CategoryID   int64  `json:"category_id" db:"id"`
+	CategoryName string `json:"category_name" db:"category_name"`
 }
 
 type Post struct {
-	PostID      int64
-	PostMessage string
+	UserID     int64     `json:"user_id" db:"id"`
+	CategoryID int64     `json:"category_id" db:"category_id"`
+	PostID     int64     `json:"post_id" db:"post_id"`
+	Message    string    `json:"message" db:"message"`
+	Title      string    `json:"title" db:"title"`
+	Excerpt    string    `json:"excerpt" db:"excerpt"`
+	ReadTime   int64     `json:"read_time" db:"read_time"`
+	DateTime   time.Time `json:"date_time" db:"datetime"`
 }
 
 // Use a method on the custom BlogModel type to run the SQL query.
-func (m BlogModel) AllCategories() ([]Category, error) {
+func (m BlogModel) AllCategories() ([]CategoryList, error) {
 	rows, err := m.DB.Query("SELECT * FROM category;")
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var categories []Category
+	var categories []CategoryList
 	for rows.Next() {
-		var category Category
+		var category CategoryList
 		err := rows.Scan(&category.CategoryID, &category.CategoryName)
 		if err != nil {
 			return nil, err
@@ -61,7 +73,7 @@ func (m BlogModel) AllPosts() ([]Post, error) {
 	var posts []Post
 	for rows.Next() {
 		var post Post
-		err := rows.Scan(&post.PostID, &post.PostMessage)
+		err := rows.Scan(&post.PostID, &post.Message)
 		if err != nil {
 			return nil, err
 		}
@@ -114,4 +126,77 @@ func (m BlogModel) Login(lc auth.LoginCredentials) (bool, error) {
 		return false, err
 	}
 	return validCreds, nil
+}
+
+func (m BlogModel) AddCategory(c Category) (bool, error) {
+	_, err := m.DB.Exec("INSERT INTO category(category_name) VALUES($1)", c.CategoryName)
+	if err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
+func (m BlogModel) PutCategory(categoryId int, newCategoryName string) (bool, error) {
+	fmt.Println("categoryId ", categoryId)
+	fmt.Println("newCategoryName ", newCategoryName)
+	_, err := m.DB.Exec("UPDATE category SET category_name = $1 WHERE id = $2", newCategoryName, categoryId)
+	if err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
+func (m BlogModel) DeleteCategory(categoryId int) (bool, error) {
+	_, err := m.DB.Exec("DELETE FROM category WHERE id = $1", categoryId)
+	if err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
+func (m BlogModel) AddPost(p Post) (bool, error) {
+	_, err := m.DB.Exec("INSERT INTO post(user_id, category_id, title, excerpt, read_time, datetime, message) VALUES($1, $2, $3, $4, $5, $6, $7)",
+		p.UserID, p.CategoryID, p.Title, p.Excerpt, p.ReadTime, p.DateTime, p.Message)
+	if err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
+func (m BlogModel) PutPost(postid int, p Post) (bool, error) {
+	_, err := m.DB.Exec("UPDATE post SET user_id = $1, category_id = $2, title = $3, excerpt = $4, read_time = $5, datetime = $6, message = $7",
+		p.UserID, p.CategoryID, p.Title, p.Excerpt, p.ReadTime, p.DateTime, p.Message)
+	if err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
+func (m BlogModel) DelPost(postid int) (bool, error) {
+	_, err := m.DB.Exec("DELETE FROM post WHERE id = $1", postid)
+	if err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
+func (m BlogModel) AllComments() (bool, error) {
+	rows, err := m.DB.Query("SELECT * FROM comment")
+	if err != nil {
+		return false, err
+	}
+	defer rows.Close()
+	var categories []CategoryList
+	for rows.Next() {
+		var category CategoryList
+		err := rows.Scan(&category.CategoryID, &category.CategoryName)
+		if err != nil {
+			return false, err
+		}
+		categories = append(categories, category)
+	}
+	if err = rows.Err(); err != nil {
+		return false, err
+	}
+	return true, nil
 }

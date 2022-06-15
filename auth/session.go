@@ -17,16 +17,13 @@ type RedisClient struct {
 func ConnectRedis() (*redis.Client, error) {
 	redisClient := redis.NewClient(&redis.Options{
 		Addr:     "localhost:6379",
-		Password: "", // No password set
-		DB:       0,  // Use default DB
+		Password: "",
+		DB:       0,
 	})
-	ping, err := redisClient.Ping().Result()
+	_, err := redisClient.Ping().Result()
 	if err != nil {
-		fmt.Println(err)
 		return nil, err
 	}
-	fmt.Println("redis connection with message: ", ping)
-
 	return redisClient, nil
 }
 
@@ -40,7 +37,7 @@ func (s Session) isExpired() bool {
 	return s.Expiry.Before(time.Now())
 }
 
-func (redisClient *RedisClient) CheckSession(w http.ResponseWriter, r *http.Request) int {
+func (rc *RedisClient) CheckSession(w http.ResponseWriter, r *http.Request) int {
 	// Get session_token from request cookies
 	c, err := r.Cookie("session_token")
 	if err != nil {
@@ -53,48 +50,38 @@ func (redisClient *RedisClient) CheckSession(w http.ResponseWriter, r *http.Requ
 	sessionToken := c.Value
 
 	// Check session token from cookie and redis
-	sessionTokenValue, err := redisClient.Connection.Get("session_token").Result()
+	sessionTokenRedis, err := rc.Connection.Get(sessionToken).Result()
 	jsonMap := Session{}
-	json.Unmarshal([]byte(sessionTokenValue), &jsonMap)
+	json.Unmarshal([]byte(sessionTokenRedis), &jsonMap)
 	if err != nil {
-		panic(err)
-	}
-
-	fmt.Println("session_token from redis is: ", sessionTokenValue)
-	fmt.Println("session_token from cookie is: ", sessionToken)
-
-	if sessionToken != jsonMap.Username {
-		// Return unauthorized error if token is not in our sessionToken map
 		return http.StatusUnauthorized
 	}
 
 	// Delete session token if expired
 	if jsonMap.isExpired() {
-		// delete(sessions, sessionToken)
-		fmt.Fprintf(w, "%v", http.StatusUnauthorized)
+		rc.Connection.Del(sessionToken)
 		return http.StatusUnauthorized
 	}
 
 	return http.StatusOK
 }
 
-func (redisClient *RedisClient) CreateSession(w http.ResponseWriter, lc LoginCredentials) {
+func (rc *RedisClient) CreateSession(w http.ResponseWriter, lc LoginCredentials) {
 	// Create new random session token using uuid
 	sessionToken := uuid.NewString()
 	expiresAt := time.Now().Add(3600 * time.Second)
 
 	// Setting token in Redis
-	json, err := json.Marshal(Session{Username: sessionToken, Expiry: expiresAt})
-	redisClient.Connection.Set("session_token", json, 0).Err()
+	json, err := json.Marshal(Session{Username: lc.Username, Expiry: expiresAt})
+	rc.Connection.Set(sessionToken, json, 0).Err()
 	if err != nil {
 		fmt.Println(err)
 	}
 
-	sessionTokenValue, err := redisClient.Connection.Get("session_token").Result()
+	_, err = rc.Connection.Get(sessionToken).Result()
 	if err != nil {
 		fmt.Println(err)
 	}
-	fmt.Println("session_token from redis is: ", sessionTokenValue)
 
 	// Set the client cookie for "session_token" as the session token generated and expiry of 120s
 	http.SetCookie(w, &http.Cookie{
@@ -104,7 +91,7 @@ func (redisClient *RedisClient) CreateSession(w http.ResponseWriter, lc LoginCre
 	})
 }
 
-func (redisClient *RedisClient) RefreshSession(w http.ResponseWriter, r *http.Request) {
+func (rc *RedisClient) RefreshSession(w http.ResponseWriter, r *http.Request) {
 	c, err := r.Cookie("session_token")
 	if err != nil {
 		if err == http.ErrNoCookie {
@@ -116,16 +103,9 @@ func (redisClient *RedisClient) RefreshSession(w http.ResponseWriter, r *http.Re
 	}
 	sessionToken := c.Value
 
-	sessionTokenValue, err := redisClient.Connection.Get("session").Result()
+	_, err = rc.Connection.Get(sessionToken).Result()
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-	jsonMap := Session{}
-	json.Unmarshal([]byte(sessionTokenValue), &jsonMap)
-	if sessionToken != jsonMap.Username {
 		w.WriteHeader(http.StatusUnauthorized)
-		return
 	}
 
 	// Create new session for current user if session is valid
@@ -137,10 +117,10 @@ func (redisClient *RedisClient) RefreshSession(w http.ResponseWriter, r *http.Re
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
-	redisClient.Connection.Set("session_token", newSessionTokenString, 0).Err()
+	rc.Connection.Set(newSessionToken, newSessionTokenString, 0).Err()
 
 	// Delete previous session
-	// delete(sessions, sessionToken)
+	rc.Connection.Del(sessionToken)
 
 	// Set new token as user's session_token cookie
 	http.SetCookie(w, &http.Cookie{
@@ -150,7 +130,7 @@ func (redisClient *RedisClient) RefreshSession(w http.ResponseWriter, r *http.Re
 	})
 }
 
-func (redisClient *RedisClient) RemoveSession(w http.ResponseWriter, r *http.Request) {
+func (rc *RedisClient) RemoveSession(w http.ResponseWriter, r *http.Request) {
 	c, err := r.Cookie("session_token")
 	if err != nil {
 		if err == http.ErrNoCookie {
@@ -164,9 +144,8 @@ func (redisClient *RedisClient) RemoveSession(w http.ResponseWriter, r *http.Req
 	}
 	sessionToken := c.Value
 
-	// TODO: remove sessions from redis
-	fmt.Println("sessionToken to delete: ", sessionToken)
-	// delete(sessions, sessionToken)
+	// Removing Session from Redis
+	rc.Connection.Del(sessionToken).Err()
 
 	// Remove Cookie
 	http.SetCookie(w, &http.Cookie{
