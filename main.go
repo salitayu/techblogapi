@@ -53,10 +53,11 @@ func main() {
 	// Initialize Env with models.BlogModel that wraps connection pool
 	env := &Env{
 		blog:  models.BlogModel{DB: db},
-		cache: auth.RedisClient{Connection: redisConn},
+		cache: auth.RedisClient{Conn: redisConn},
 	}
 
 	r := mux.NewRouter()
+	r.Use(contentTypeApplicationJsonMiddleware)
 
 	r.HandleFunc("/", env.Handle).Methods("GET")
 	r.HandleFunc("/register", env.Register).Methods("POST")
@@ -98,6 +99,13 @@ func main() {
 	r.HandleFunc("/logout", env.Logout).Methods("POST")
 	http.Handle("/", r)
 	log.Fatal(http.ListenAndServe(":8080", nil))
+}
+
+func contentTypeApplicationJsonMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		next.ServeHTTP(w, r)
+	})
 }
 
 func (env *Env) HandleCheck(w http.ResponseWriter, r *http.Request) int {
@@ -146,13 +154,13 @@ func (env *Env) GetCategoryByID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	fmt.Println("id ", id)
-	category, err := env.blog.GetCatByID(id)
+	categoryName, err := env.blog.GetCatNameByID(id)
 	if err != nil {
 		fmt.Fprintf(w, "%s", err)
 		return
 	}
-	fmt.Println("categoryByID ", category)
-	json.NewEncoder(w).Encode(category)
+	fmt.Println("categoryByID ", categoryName)
+	json.NewEncoder(w).Encode(map[string]string{"category_name": categoryName})
 }
 
 func (env *Env) GetIDForCategory(w http.ResponseWriter, r *http.Request) {
@@ -168,6 +176,7 @@ func (env *Env) GetIDForCategory(w http.ResponseWriter, r *http.Request) {
 	}
 	json.NewEncoder(w).Encode(map[string]int{"category_id": id})
 }
+
 func (env *Env) InsertCategory(w http.ResponseWriter, r *http.Request) {
 	responseCode := env.HandleCheck(w, r)
 	if responseCode != http.StatusOK {

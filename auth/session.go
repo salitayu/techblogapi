@@ -11,7 +11,7 @@ import (
 )
 
 type RedisClient struct {
-	Connection *redis.Client
+	Conn *redis.Client
 }
 
 func ConnectRedis() (*redis.Client, error) {
@@ -50,7 +50,7 @@ func (rc *RedisClient) CheckSession(w http.ResponseWriter, r *http.Request) int 
 	sessionToken := c.Value
 
 	// Check session token from cookie and redis
-	sessionTokenRedis, err := rc.Connection.Get(sessionToken).Result()
+	sessionTokenRedis, err := rc.Conn.Get(sessionToken).Result()
 	jsonMap := Session{}
 	json.Unmarshal([]byte(sessionTokenRedis), &jsonMap)
 	if err != nil {
@@ -59,7 +59,7 @@ func (rc *RedisClient) CheckSession(w http.ResponseWriter, r *http.Request) int 
 
 	// Delete session token if expired
 	if jsonMap.isExpired() {
-		rc.Connection.Del(sessionToken)
+		rc.Conn.Del(sessionToken)
 		return http.StatusUnauthorized
 	}
 
@@ -73,12 +73,12 @@ func (rc *RedisClient) CreateSession(w http.ResponseWriter, lc LoginCredentials)
 
 	// Setting token in Redis
 	json, err := json.Marshal(Session{Username: lc.Username, Expiry: expiresAt})
-	rc.Connection.Set(sessionToken, json, 0).Err()
+	rc.Conn.Set(sessionToken, json, 0).Err()
 	if err != nil {
 		fmt.Println(err)
 	}
 
-	_, err = rc.Connection.Get(sessionToken).Result()
+	_, err = rc.Conn.Get(sessionToken).Result()
 	if err != nil {
 		fmt.Println(err)
 	}
@@ -103,7 +103,7 @@ func (rc *RedisClient) RefreshSession(w http.ResponseWriter, r *http.Request) {
 	}
 	sessionToken := c.Value
 
-	_, err = rc.Connection.Get(sessionToken).Result()
+	_, err = rc.Conn.Get(sessionToken).Result()
 	if err != nil {
 		w.WriteHeader(http.StatusUnauthorized)
 	}
@@ -117,10 +117,10 @@ func (rc *RedisClient) RefreshSession(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
-	rc.Connection.Set(newSessionToken, newSessionTokenString, 0).Err()
+	rc.Conn.Set(newSessionToken, newSessionTokenString, 0).Err()
 
 	// Delete previous session
-	rc.Connection.Del(sessionToken)
+	rc.Conn.Del(sessionToken)
 
 	// Set new token as user's session_token cookie
 	http.SetCookie(w, &http.Cookie{
@@ -145,7 +145,7 @@ func (rc *RedisClient) RemoveSession(w http.ResponseWriter, r *http.Request) {
 	sessionToken := c.Value
 
 	// Removing Session from Redis
-	rc.Connection.Del(sessionToken).Err()
+	rc.Conn.Del(sessionToken).Err()
 
 	// Remove Cookie
 	http.SetCookie(w, &http.Cookie{

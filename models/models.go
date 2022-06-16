@@ -67,7 +67,7 @@ func (m BlogModel) AllCategories() ([]Category, error) {
 	return categories, nil
 }
 
-func (m BlogModel) GetCatByID(id int) (string, error) {
+func (m BlogModel) GetCatNameByID(id int) (string, error) {
 	category := Category{}
 	rows, err := m.DB.Query("SELECT category_name FROM category WHERE id = $1", id)
 	if err != nil {
