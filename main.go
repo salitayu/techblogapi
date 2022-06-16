@@ -104,6 +104,8 @@ func main() {
 func contentTypeApplicationJsonMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE")
 		next.ServeHTTP(w, r)
 	})
 }
@@ -129,10 +131,6 @@ func (env *Env) Handle(w http.ResponseWriter, r *http.Request) {
 }
 
 func (env *Env) GetCategories(w http.ResponseWriter, r *http.Request) {
-	responseCode := env.HandleCheck(w, r)
-	if responseCode != http.StatusOK {
-		return
-	}
 	// Execute the SQL query by calling the AllCategoriesMethod() from env.blog
 	categories, err := env.blog.AllCategories()
 	if err != nil {
@@ -216,19 +214,13 @@ func (env *Env) DeleteCategory(w http.ResponseWriter, r *http.Request) {
 }
 
 func (env *Env) GetPosts(w http.ResponseWriter, r *http.Request) {
-	responseCode := env.HandleCheck(w, r)
-	if responseCode != http.StatusOK {
-		return
-	}
 	posts, err := env.blog.AllPosts()
 	if err != nil {
 		log.Print(err)
 		http.Error(w, http.StatusText(500), 500)
 		return
 	}
-	for i, post := range posts {
-		fmt.Fprintf(w, "%v, %s", i, post.Message)
-	}
+	json.NewEncoder(w).Encode(map[string][]models.Post{"results": posts})
 }
 
 func (env *Env) InsertPost(w http.ResponseWriter, r *http.Request) {
@@ -280,11 +272,13 @@ func (env *Env) DeletePost(w http.ResponseWriter, r *http.Request) {
 }
 
 func (env *Env) GetComments(w http.ResponseWriter, r *http.Request) {
-	responseCode := env.HandleCheck(w, r)
-	if responseCode != http.StatusOK {
+	comments, err := env.blog.AllComments()
+	if err != nil {
+		log.Print(err)
+		http.Error(w, http.StatusText(500), 500)
 		return
 	}
-	env.blog.AllComments()
+	json.NewEncoder(w).Encode(map[string][]models.Comment{"results": comments})
 }
 
 func (env *Env) InsertComment(w http.ResponseWriter, r *http.Request) {
