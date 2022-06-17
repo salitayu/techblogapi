@@ -72,7 +72,7 @@ func main() {
 	r.HandleFunc("/category/{id}", env.DeleteCategory).Methods("DELETE")
 
 	r.HandleFunc("/posts", env.GetPosts).Methods("GET")
-	// r.HandleFunc("/posts/{id}", env.GetPostsByCategoryId).Methods("GET")
+	r.HandleFunc("/posts/category/{id}", env.GetPostsByCategoryId).Methods("GET")
 	// r.HandleFunc("/post/{id}", env.GetPostById).Methods("GET")
 	r.HandleFunc("/post", env.InsertPost).Methods("POST")
 	// r.HandleFunc("/posts", env.BulkInsertPosts).Methods("POST")
@@ -190,6 +190,10 @@ func (env *Env) InsertCategory(w http.ResponseWriter, r *http.Request) {
 }
 
 func (env *Env) EditCategory(w http.ResponseWriter, r *http.Request) {
+	responseCode := env.HandleCheck(w, r)
+	if responseCode != http.StatusOK {
+		return
+	}
 	vars := mux.Vars(r)
 	w.WriteHeader(http.StatusOK)
 	fmt.Fprintf(w, "Category Id: %v\n", vars["id"])
@@ -220,6 +224,17 @@ func (env *Env) GetPosts(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, http.StatusText(500), 500)
 		return
 	}
+	fmt.Println("posts ", posts)
+	json.NewEncoder(w).Encode(map[string][]models.Post{"results": posts})
+}
+
+func (env *Env) GetPostsByCategoryId(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	categoryid, err := strconv.Atoi(vars["id"])
+	if err != nil {
+		return
+	}
+	posts, err := env.blog.AllPostsByCatID(categoryid)
 	json.NewEncoder(w).Encode(map[string][]models.Post{"results": posts})
 }
 
@@ -230,6 +245,7 @@ func (env *Env) InsertPost(w http.ResponseWriter, r *http.Request) {
 	}
 	post := models.Post{}
 	err := json.NewDecoder(r.Body).Decode(&post)
+	fmt.Println("post to insert ", post)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 	}
