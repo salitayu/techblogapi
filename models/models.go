@@ -31,8 +31,8 @@ type Post struct {
 	PostID     int64     `json:"post_id,omitempty" db:"id"`
 	UserID     int64     `json:"user_id" db:"user_id"`
 	CategoryID int64     `json:"category_id" db:"category_id"`
-	Message    string    `json:"message" db:"message"`
 	Title      string    `json:"title" db:"title"`
+	Message    string    `json:"message" db:"message"`
 	Excerpt    string    `json:"excerpt" db:"excerpt"`
 	ReadTime   int64     `json:"read_time" db:"read_time"`
 	DateTime   time.Time `json:"date_time" db:"datetime"`
@@ -47,7 +47,7 @@ type Comment struct {
 
 // Use a method on the custom BlogModel type to run the SQL query.
 func (m BlogModel) AllCategories() ([]Category, error) {
-	rows, err := m.DB.Query("SELECT * FROM category;")
+	rows, err := m.DB.Query("SELECT * FROM category")
 	if err != nil {
 		return nil, err
 	}
@@ -275,8 +275,8 @@ func (m BlogModel) AddComment(c Comment) (bool, error) {
 }
 
 func (m BlogModel) PutComment(postid int, c Comment) (bool, error) {
-	_, err := m.DB.Exec("UPDATE comment SET user_id = $1, message = $2, post_id = $3",
-		c.UserID, c.PostID, c.Message)
+	_, err := m.DB.Exec("UPDATE comment SET user_id = $1, message = $2 WHERE post_id = $3",
+		c.UserID, c.Message, postid)
 	if err != nil {
 		return false, err
 	}
