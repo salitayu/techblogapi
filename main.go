@@ -98,28 +98,35 @@ func main() {
 	// r.HandleFunc("/image/post/{id}", env.DeleteImageByPostId).Methods("DELETE")
 
 	r.HandleFunc("/logout", env.Logout).Methods("POST")
-	headersOk := handlers.AllowedHeaders([]string{"Content-Type", "X-Requested-With"})
-	originsOk := handlers.AllowedOrigins([]string{"http://localhost:3000"})
+
+	headersOk := handlers.AllowedHeaders([]string{"Content-Type", "X-Requested-With", "Set-Cookie", "Authorization"})
+	originsOk := handlers.AllowedOrigins([]string{"http://127.0.0.1:3000", "localhost:3000", "127.0.0.1:3000"})
 	methodsOk := handlers.AllowedMethods([]string{"GET", "HEAD", "POST", "PUT", "OPTIONS"})
+	allowCreds := handlers.AllowCredentials()
+	exposedHeaders := handlers.ExposedHeaders([]string{"Set-Cookie"})
 	
-	// start server listen
-	// with error handling
-	log.Fatal(http.ListenAndServe(":8080", handlers.CORS(originsOk, headersOk, methodsOk)(r)))
-	// http.Handle("/", r)
+	// start server listen with error handling
+	r.Use(contentTypeApplicationJsonMiddleware)
+	log.Fatal(http.ListenAndServe(":8080", handlers.CORS(originsOk, headersOk, methodsOk, exposedHeaders, allowCreds)(r)))
 	// log.Fatal(http.ListenAndServe(":8080", nil))
+	http.Handle("/", r)
 }
 
-// func contentTypeApplicationJsonMiddleware(next http.Handler) http.Handler {
-// 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-// 		w.Header().Set("Access-Control-Allow-Origin", "*")
-// 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE")
-// 		w.Header().Set("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept")
-// 		next.ServeHTTP(w, r)
-// 	})
-// }
+func contentTypeApplicationJsonMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		next.ServeHTTP(w, r)
+	})
+}
 
 func (env *Env) HandleCheck(w http.ResponseWriter, r *http.Request) int {
 	loggedIn := env.cache.CheckSession(w, r)
+	fmt.Println("logged in ", loggedIn)
+	
+	for _, c := range r.Cookies() {
+		fmt.Println("allCookies", c)
+    }
+
 	if loggedIn != http.StatusOK {
 		response := map[string]int{"Login returned code": loggedIn}
 		json.NewEncoder(w).Encode(response)
@@ -139,7 +146,6 @@ func (env *Env) Handle(w http.ResponseWriter, r *http.Request) {
 }
 
 func (env *Env) GetCategories(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
 	// Execute the SQL query by calling the AllCategoriesMethod() from env.blog
 	categories, err := env.blog.AllCategories()
 	if err != nil {
@@ -151,11 +157,10 @@ func (env *Env) GetCategories(w http.ResponseWriter, r *http.Request) {
 }
 
 func (env *Env) GetCategoryByID(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	responseCode := env.HandleCheck(w, r)
-	if responseCode != http.StatusOK {
-		return
-	}
+	// responseCode := env.HandleCheck(w, r)
+	// if responseCode != http.StatusOK {
+	// 	return
+	// }
 	vars := mux.Vars(r)
 	id, err := strconv.Atoi(vars["id"])
 	if err != nil {
@@ -172,11 +177,10 @@ func (env *Env) GetCategoryByID(w http.ResponseWriter, r *http.Request) {
 }
 
 func (env *Env) GetIDForCategory(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	responseCode := env.HandleCheck(w, r)
-	if responseCode != http.StatusOK {
-		return
-	}
+	// responseCode := env.HandleCheck(w, r)
+	// if responseCode != http.StatusOK {
+	// 	return
+	// }
 	vars := mux.Vars(r)
 	name := vars["name"]
 	id, err := env.blog.GetCatIDByName(name)
@@ -187,11 +191,10 @@ func (env *Env) GetIDForCategory(w http.ResponseWriter, r *http.Request) {
 }
 
 func (env *Env) InsertCategory(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	responseCode := env.HandleCheck(w, r)
-	if responseCode != http.StatusOK {
-		return
-	}
+	// responseCode := env.HandleCheck(w, r)
+	// if responseCode != http.StatusOK {
+	// 	return
+	// }
 	var c models.Category
 	err := json.NewDecoder(r.Body).Decode(&c)
 	if err != nil {
@@ -202,11 +205,10 @@ func (env *Env) InsertCategory(w http.ResponseWriter, r *http.Request) {
 }
 
 func (env *Env) EditCategory(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	responseCode := env.HandleCheck(w, r)
-	if responseCode != http.StatusOK {
-		return
-	}
+	// responseCode := env.HandleCheck(w, r)
+	// if responseCode != http.StatusOK {
+	// 	return
+	// }
 	vars := mux.Vars(r)
 	w.WriteHeader(http.StatusOK)
 	fmt.Fprintf(w, "Category Id: %v\n", vars["id"])
@@ -220,7 +222,6 @@ func (env *Env) EditCategory(w http.ResponseWriter, r *http.Request) {
 }
 
 func (env *Env) DeleteCategory(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
 	vars := mux.Vars(r)
 	w.WriteHeader(http.StatusOK)
 	fmt.Fprintf(w, "Category Id: %v\n", vars["id"])
@@ -232,7 +233,10 @@ func (env *Env) DeleteCategory(w http.ResponseWriter, r *http.Request) {
 }
 
 func (env *Env) GetPosts(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
+	// responseCode := env.HandleCheck(w, r)
+	// if responseCode != http.StatusOK {
+	// 	return
+	// }
 	posts, err := env.blog.AllPosts()
 	if err != nil {
 		log.Print(err)
@@ -244,7 +248,10 @@ func (env *Env) GetPosts(w http.ResponseWriter, r *http.Request) {
 }
 
 func (env *Env) GetPostsByCategoryId(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
+	// responseCode := env.HandleCheck(w, r)
+	// if responseCode != http.StatusOK {
+	// 	return
+	// }
 	vars := mux.Vars(r)
 	categoryid, err := strconv.Atoi(vars["id"])
 	if err != nil {
@@ -255,7 +262,6 @@ func (env *Env) GetPostsByCategoryId(w http.ResponseWriter, r *http.Request) {
 }
 
 func (env *Env) InsertPost(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
 	// responseCode := env.HandleCheck(w, r)
 	// if responseCode != http.StatusOK {
 	// 	return
@@ -273,10 +279,10 @@ func (env *Env) InsertPost(w http.ResponseWriter, r *http.Request) {
 }
 
 func (env *Env) EditPost(w http.ResponseWriter, r *http.Request) {
-	responseCode := env.HandleCheck(w, r)
-	if responseCode != http.StatusOK {
-		return
-	}
+	// responseCode := env.HandleCheck(w, r)
+	// if responseCode != http.StatusOK {
+	// 	return
+	// }
 	vars := mux.Vars(r)
 	w.WriteHeader(http.StatusOK)
 	fmt.Fprintf(w, "Post Id: %v\n", vars["id"])
@@ -290,10 +296,10 @@ func (env *Env) EditPost(w http.ResponseWriter, r *http.Request) {
 }
 
 func (env *Env) DeletePost(w http.ResponseWriter, r *http.Request) {
-	responseCode := env.HandleCheck(w, r)
-	if responseCode != http.StatusOK {
-		return
-	}
+	// responseCode := env.HandleCheck(w, r)
+	// if responseCode != http.StatusOK {
+	// 	return
+	// }
 	vars := mux.Vars(r)
 	w.WriteHeader(http.StatusOK)
 	fmt.Fprintf(w, "Post Id: %v\n", vars["id"])
@@ -382,6 +388,8 @@ func (env *Env) Login(w http.ResponseWriter, r *http.Request) {
 	var lc auth.LoginCredentials
 	err := json.NewDecoder(r.Body).Decode(&lc)
 	if err != nil {
+		fmt.Println("lc")
+		fmt.Println(lc)
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		fmt.Fprintf(w, "Bad Request")
 		return

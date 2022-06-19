@@ -40,6 +40,7 @@ func (s Session) isExpired() bool {
 func (rc *RedisClient) CheckSession(w http.ResponseWriter, r *http.Request) int {
 	// Get session_token from request cookies
 	c, err := r.Cookie("session_token")
+	fmt.Println("c ", c)
 	if err != nil {
 		if err == http.ErrNoCookie {
 			// check if cookie is not set
@@ -48,28 +49,34 @@ func (rc *RedisClient) CheckSession(w http.ResponseWriter, r *http.Request) int 
 		return http.StatusBadRequest
 	}
 	sessionToken := c.Value
+	fmt.Println("sessionToken ", sessionToken)
 
 	// Check session token from cookie and redis
 	sessionTokenRedis, err := rc.Conn.Get(sessionToken).Result()
+	fmt.Println("sessionTokenRedis ", sessionTokenRedis)
 	jsonMap := Session{}
 	json.Unmarshal([]byte(sessionTokenRedis), &jsonMap)
 	if err != nil {
+		fmt.Println("status unauthorized")
 		return http.StatusUnauthorized
 	}
 
 	// Delete session token if expired
 	if jsonMap.isExpired() {
+		fmt.Println("jsonmapisexpired")
 		rc.Conn.Del(sessionToken)
 		return http.StatusUnauthorized
 	}
-
+	fmt.Println("statusok")
 	return http.StatusOK
 }
 
 func (rc *RedisClient) CreateSession(w http.ResponseWriter, lc LoginCredentials) {
 	// Create new random session token using uuid
 	sessionToken := uuid.NewString()
+	fmt.Println("createSessionToken ", sessionToken)
 	expiresAt := time.Now().Add(3600 * time.Second)
+	fmt.Println("expiresAt ", expiresAt)
 
 	// Setting token in Redis
 	json, err := json.Marshal(Session{Username: lc.Username, Expiry: expiresAt})
@@ -78,16 +85,20 @@ func (rc *RedisClient) CreateSession(w http.ResponseWriter, lc LoginCredentials)
 		fmt.Println(err)
 	}
 
-	_, err = rc.Conn.Get(sessionToken).Result()
+	getSessionToken, err := rc.Conn.Get(sessionToken).Result()
 	if err != nil {
 		fmt.Println(err)
 	}
+	fmt.Println("getSessionToken ", getSessionToken)
 
 	// Set the client cookie for "session_token" as the session token generated and expiry of 120s
 	http.SetCookie(w, &http.Cookie{
 		Name:    "session_token",
 		Value:   sessionToken,
+		// Path: "/",
 		Expires: expiresAt,
+		// SameSite: http.SameSiteNoneMode,
+        // Secure: false,
 	})
 }
 

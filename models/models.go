@@ -31,9 +31,9 @@ type Post struct {
 	PostID     int64     `json:"post_id,omitempty" db:"id"`
 	UserID     int64     `json:"user_id" db:"user_id"`
 	CategoryID int64     `json:"category_id" db:"category_id"`
+	Slug	   string    `json:"slug" db:"slug"`
 	Title      string    `json:"title" db:"title"`
 	Message    string    `json:"message" db:"message"`
-	Excerpt    string    `json:"excerpt" db:"excerpt"`
 	ReadTime   int64     `json:"read_time" db:"read_time"`
 	DateTime   time.Time `json:"date_time" db:"datetime"`
 }
@@ -110,7 +110,7 @@ func (m BlogModel) AllPosts() ([]Post, error) {
 	var posts []Post
 	for rows.Next() {
 		var post Post
-		err := rows.Scan(&post.PostID, &post.UserID, &post.CategoryID, &post.Title, &post.Excerpt, &post.ReadTime, &post.DateTime, &post.Message)
+		err := rows.Scan(&post.PostID, &post.UserID, &post.CategoryID, &post.Title, &post.ReadTime,  &post.DateTime, &post.Message, &post.Slug)
 		if err != nil {
 			return nil, err
 		}
@@ -132,7 +132,7 @@ func (m BlogModel) AllPostsByCatID(categoryid int) ([]Post, error) {
 	var posts []Post
 	for rows.Next() {
 		var post Post
-		err := rows.Scan(&post.PostID, &post.UserID, &post.CategoryID, &post.Title, &post.Excerpt, &post.ReadTime, &post.DateTime, &post.Message)
+		err := rows.Scan(&post.PostID, &post.UserID, &post.CategoryID, &post.Title, &post.ReadTime, &post.DateTime, &post.Message, &post.Slug)
 		if err != nil {
 			return nil, err
 		}
@@ -217,9 +217,9 @@ func (m BlogModel) DeleteCategory(categoryId int) (bool, error) {
 }
 
 func (m BlogModel) AddPost(p Post) (bool, error) {
-	fmt.Println(p.UserID, p.CategoryID, p.Title, p.Excerpt, p.ReadTime, p.DateTime, p.Message)
-	_, err := m.DB.Exec("INSERT INTO post (user_id, category_id, title, excerpt, read_time, datetime, message) VALUES($1, $2, $3, $4, $5, $6, $7)",
-		p.UserID, p.CategoryID, p.Title, p.Excerpt, p.ReadTime, p.DateTime, p.Message)
+	fmt.Println(p.UserID, p.CategoryID, p.Title, p.Slug, p.ReadTime, p.DateTime, p.Message)
+	_, err := m.DB.Exec("INSERT INTO post (user_id, category_id, title, slug, read_time, datetime, message) VALUES($1, $2, $3, $4, $5, $6, $7)",
+		p.UserID, p.CategoryID, p.Title, p.Slug, p.ReadTime, p.DateTime, p.Message)
 	if err != nil {
 		fmt.Println("err ", err)
 		return false, err
@@ -228,8 +228,8 @@ func (m BlogModel) AddPost(p Post) (bool, error) {
 }
 
 func (m BlogModel) PutPost(postid int, p Post) (bool, error) {
-	_, err := m.DB.Exec("UPDATE post SET user_id = $1, category_id = $2, title = $3, excerpt = $4, read_time = $5, datetime = $6, message = $7 WHERE id = $8",
-		p.UserID, p.CategoryID, p.Title, p.Excerpt, p.ReadTime, p.DateTime, p.Message, postid)
+	_, err := m.DB.Exec("UPDATE post SET user_id = $1, category_id = $2, title = $3, slug = $4, read_time = $5, datetime = $6, message = $7 WHERE id = $8",
+		p.UserID, p.CategoryID, p.Title, p.Slug, p.ReadTime, p.DateTime, p.Message, postid)
 	if err != nil {
 		return false, err
 	}
