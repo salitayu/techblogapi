@@ -95,10 +95,7 @@ func (rc *RedisClient) CreateSession(w http.ResponseWriter, lc LoginCredentials)
 	http.SetCookie(w, &http.Cookie{
 		Name:    "session_token",
 		Value:   sessionToken,
-		// Path: "/",
 		Expires: expiresAt,
-		// SameSite: http.SameSiteNoneMode,
-        // Secure: false,
 	})
 }
 

@@ -25,6 +25,7 @@ type User struct {
 type Category struct {
 	CategoryID   int64  `json:"category_id,omitempty" db:"id"`
 	CategoryName string `json:"category_name" db:"category_name"`
+	Slug string `json:"slug" db:"slug"`
 }
 
 type Post struct {
@@ -55,7 +56,7 @@ func (m BlogModel) AllCategories() ([]Category, error) {
 	var categories []Category
 	for rows.Next() {
 		var category Category
-		err := rows.Scan(&category.CategoryID, &category.CategoryName)
+		err := rows.Scan(&category.CategoryID, &category.CategoryName, &category.Slug)
 		if err != nil {
 			return nil, err
 		}
@@ -116,7 +117,7 @@ func (m BlogModel) AllPosts() ([]Post, error) {
 		}
 		posts = append(posts, post)
 	}
-	fmt.Println("posts ", posts)
+	// fmt.Println("posts ", posts)
 	if err = rows.Err(); err != nil {
 		return nil, err
 	}
@@ -125,6 +126,81 @@ func (m BlogModel) AllPosts() ([]Post, error) {
 
 func (m BlogModel) AllPostsByCatID(categoryid int) ([]Post, error) {
 	rows, err := m.DB.Query("SELECT * from post WHERE category_id = $1", categoryid)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var posts []Post
+	for rows.Next() {
+		var post Post
+		err := rows.Scan(&post.PostID, &post.UserID, &post.CategoryID, &post.Title, &post.ReadTime, &post.DateTime, &post.Message, &post.Slug)
+		if err != nil {
+			return nil, err
+		}
+		posts = append(posts, post)
+	}
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+	return posts, nil
+}
+
+func (m BlogModel) AllPostsByCatSlug(slug string) ([]Post, error) {
+	rows, err := m.DB.Query("SELECT id FROM category WHERE slug = $1", slug)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	categoryId := 0
+	for rows.Next() {
+		err := rows.Scan(&categoryId)
+		if err != nil {
+			return nil, err
+		}
+	}
+	rows, err = m.DB.Query("SELECT * FROM post WHERE category_id = $1", categoryId)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var posts []Post
+	for rows.Next() {
+		var post Post
+		err := rows.Scan(&post.PostID, &post.UserID, &post.CategoryID, &post.Title, &post.ReadTime, &post.DateTime, &post.Message, &post.Slug)
+		if err != nil {
+			return nil, err
+		}
+		posts = append(posts, post)
+	}
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+	return posts, nil
+}
+
+func (m BlogModel) PostById(id int)([]Post, error) {
+	rows, err := m.DB.Query("SELECT * FROM post WHERE id = $1", id)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var posts []Post
+	for rows.Next() {
+		var post Post
+		err := rows.Scan(&post.PostID, &post.UserID, &post.CategoryID, &post.Title, &post.ReadTime, &post.DateTime, &post.Message, &post.Slug)
+		if err != nil {
+			return nil, err
+		}
+		posts = append(posts, post)
+	}
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+	return posts, nil
+}
+
+func (m BlogModel) PostBySlug(slug string) ([]Post, error) {
+	rows, err := m.DB.Query("SELECT * FROM post WHERE slug = $1", slug)
 	if err != nil {
 		return nil, err
 	}
