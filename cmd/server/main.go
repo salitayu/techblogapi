@@ -12,8 +12,8 @@ import (
 	"techblogapi/models"
 	"time"
 
-	"github.com/gorilla/mux"
 	"github.com/gorilla/handlers"
+	"github.com/gorilla/mux"
 	"github.com/joho/godotenv"
 	_ "github.com/lib/pq"
 )
@@ -106,7 +106,7 @@ func main() {
 	methodsOk := handlers.AllowedMethods([]string{"GET", "HEAD", "POST", "PUT", "OPTIONS", "DELETE"})
 	allowCreds := handlers.AllowCredentials()
 	exposedHeaders := handlers.ExposedHeaders([]string{"Set-Cookie"})
-	
+
 	// start server listen with error handling
 	r.Use(contentTypeApplicationJsonMiddleware)
 	log.Fatal(http.ListenAndServe(":8080", handlers.CORS(originsOk, headersOk, methodsOk, exposedHeaders, allowCreds)(r)))
@@ -123,10 +123,10 @@ func contentTypeApplicationJsonMiddleware(next http.Handler) http.Handler {
 func (env *Env) HandleCheck(w http.ResponseWriter, r *http.Request) int {
 	loggedIn := env.cache.CheckSession(w, r)
 	fmt.Println("logged in ", loggedIn)
-	
+
 	for _, c := range r.Cookies() {
 		fmt.Println("allCookies", c)
-    }
+	}
 
 	if loggedIn != http.StatusOK {
 		response := map[string]int{"Login returned code": loggedIn}
@@ -158,10 +158,10 @@ func (env *Env) GetCategories(w http.ResponseWriter, r *http.Request) {
 }
 
 func (env *Env) GetCategoryByID(w http.ResponseWriter, r *http.Request) {
-	responseCode := env.HandleCheck(w, r)
-	if responseCode != http.StatusOK {
-		return
-	}
+	// responseCode := env.HandleCheck(w, r)
+	// if responseCode != http.StatusOK {
+	// 	return
+	// }
 	vars := mux.Vars(r)
 	id, err := strconv.Atoi(vars["id"])
 	if err != nil {
@@ -178,10 +178,10 @@ func (env *Env) GetCategoryByID(w http.ResponseWriter, r *http.Request) {
 }
 
 func (env *Env) GetIDForCategory(w http.ResponseWriter, r *http.Request) {
-	responseCode := env.HandleCheck(w, r)
-	if responseCode != http.StatusOK {
-		return
-	}
+	// responseCode := env.HandleCheck(w, r)
+	// if responseCode != http.StatusOK {
+	// 	return
+	// }
 	vars := mux.Vars(r)
 	name := vars["name"]
 	id, err := env.blog.GetCatIDByName(name)
@@ -192,10 +192,10 @@ func (env *Env) GetIDForCategory(w http.ResponseWriter, r *http.Request) {
 }
 
 func (env *Env) InsertCategory(w http.ResponseWriter, r *http.Request) {
-	responseCode := env.HandleCheck(w, r)
-	if responseCode != http.StatusOK {
-		return
-	}
+	// responseCode := env.HandleCheck(w, r)
+	// if responseCode != http.StatusOK {
+	// 	return
+	// }
 	var c models.Category
 	err := json.NewDecoder(r.Body).Decode(&c)
 	if err != nil {
@@ -206,10 +206,10 @@ func (env *Env) InsertCategory(w http.ResponseWriter, r *http.Request) {
 }
 
 func (env *Env) EditCategory(w http.ResponseWriter, r *http.Request) {
-	responseCode := env.HandleCheck(w, r)
-	if responseCode != http.StatusOK {
-		return
-	}
+	// responseCode := env.HandleCheck(w, r)
+	// if responseCode != http.StatusOK {
+	// 	return
+	// }
 	vars := mux.Vars(r)
 	w.WriteHeader(http.StatusOK)
 	fmt.Fprintf(w, "Category Id: %v\n", vars["id"])
@@ -223,10 +223,10 @@ func (env *Env) EditCategory(w http.ResponseWriter, r *http.Request) {
 }
 
 func (env *Env) DeleteCategory(w http.ResponseWriter, r *http.Request) {
-	responseCode := env.HandleCheck(w, r)
-	if responseCode != http.StatusOK {
-		return
-	}
+	// responseCode := env.HandleCheck(w, r)
+	// if responseCode != http.StatusOK {
+	// 	return
+	// }
 	vars := mux.Vars(r)
 	w.WriteHeader(http.StatusOK)
 	fmt.Fprintf(w, "Category Id: %v\n", vars["id"])
@@ -238,10 +238,10 @@ func (env *Env) DeleteCategory(w http.ResponseWriter, r *http.Request) {
 }
 
 func (env *Env) GetPosts(w http.ResponseWriter, r *http.Request) {
-	responseCode := env.HandleCheck(w, r)
-	if responseCode != http.StatusOK {
-		return
-	}
+	// responseCode := env.HandleCheck(w, r)
+	// if responseCode != http.StatusOK {
+	// 	return
+	// }
 	posts, err := env.blog.AllPosts()
 	if err != nil {
 		log.Print(err)
@@ -253,10 +253,10 @@ func (env *Env) GetPosts(w http.ResponseWriter, r *http.Request) {
 }
 
 func (env *Env) GetPostById(w http.ResponseWriter, r *http.Request) {
-	responseCode := env.HandleCheck(w, r)
-	if responseCode != http.StatusOK {
-		return
-	}
+	// responseCode := env.HandleCheck(w, r)
+	// if responseCode != http.StatusOK {
+	// 	return
+	// }
 	vars := mux.Vars(r)
 	id, err := strconv.Atoi(vars["id"])
 	if err != nil {
@@ -272,10 +272,10 @@ func (env *Env) GetPostById(w http.ResponseWriter, r *http.Request) {
 }
 
 func (env *Env) GetPostBySlug(w http.ResponseWriter, r *http.Request) {
-	responseCode := env.HandleCheck(w, r)
-	if responseCode != http.StatusOK {
-		return
-	}
+	// responseCode := env.HandleCheck(w, r)
+	// if responseCode != http.StatusOK {
+	// 	return
+	// }
 	vars := mux.Vars(r)
 	slug := vars["slug"]
 	post, err := env.blog.PostBySlug(slug)
@@ -288,10 +288,10 @@ func (env *Env) GetPostBySlug(w http.ResponseWriter, r *http.Request) {
 }
 
 func (env *Env) GetPostsByCategoryId(w http.ResponseWriter, r *http.Request) {
-	responseCode := env.HandleCheck(w, r)
-	if responseCode != http.StatusOK {
-		return
-	}
+	// responseCode := env.HandleCheck(w, r)
+	// if responseCode != http.StatusOK {
+	// 	return
+	// }
 	vars := mux.Vars(r)
 	categoryid, err := strconv.Atoi(vars["id"])
 	if err != nil {
@@ -302,10 +302,10 @@ func (env *Env) GetPostsByCategoryId(w http.ResponseWriter, r *http.Request) {
 }
 
 func (env *Env) GetPostsByCategorySlug(w http.ResponseWriter, r *http.Request) {
-	responseCode := env.HandleCheck(w, r)
-	if responseCode != http.StatusOK {
-		return
-	}
+	// responseCode := env.HandleCheck(w, r)
+	// if responseCode != http.StatusOK {
+	// 	return
+	// }
 	vars := mux.Vars(r)
 	categorySlug := vars["slug"]
 	posts, err := env.blog.AllPostsByCatSlug(categorySlug)
@@ -316,10 +316,10 @@ func (env *Env) GetPostsByCategorySlug(w http.ResponseWriter, r *http.Request) {
 }
 
 func (env *Env) InsertPost(w http.ResponseWriter, r *http.Request) {
-	responseCode := env.HandleCheck(w, r)
-	if responseCode != http.StatusOK {
-		return
-	}
+	// responseCode := env.HandleCheck(w, r)
+	// if responseCode != http.StatusOK {
+	// 	return
+	// }
 	post := models.Post{}
 	err := json.NewDecoder(r.Body).Decode(&post)
 	fmt.Println("post to insert ", post)
@@ -333,10 +333,10 @@ func (env *Env) InsertPost(w http.ResponseWriter, r *http.Request) {
 }
 
 func (env *Env) EditPost(w http.ResponseWriter, r *http.Request) {
-	responseCode := env.HandleCheck(w, r)
-	if responseCode != http.StatusOK {
-		return
-	}
+	// responseCode := env.HandleCheck(w, r)
+	// if responseCode != http.StatusOK {
+	// 	return
+	// }
 	vars := mux.Vars(r)
 	w.WriteHeader(http.StatusOK)
 	fmt.Fprintf(w, "Post Id: %v\n", vars["id"])
@@ -350,10 +350,10 @@ func (env *Env) EditPost(w http.ResponseWriter, r *http.Request) {
 }
 
 func (env *Env) DeletePost(w http.ResponseWriter, r *http.Request) {
-	responseCode := env.HandleCheck(w, r)
-	if responseCode != http.StatusOK {
-		return
-	}
+	// responseCode := env.HandleCheck(w, r)
+	// if responseCode != http.StatusOK {
+	// 	return
+	// }
 	vars := mux.Vars(r)
 	w.WriteHeader(http.StatusOK)
 	fmt.Fprintf(w, "Post Id: %v\n", vars["id"])
@@ -375,10 +375,10 @@ func (env *Env) GetComments(w http.ResponseWriter, r *http.Request) {
 }
 
 func (env *Env) InsertComment(w http.ResponseWriter, r *http.Request) {
-	responseCode := env.HandleCheck(w, r)
-	if responseCode != http.StatusOK {
-		return
-	}
+	// responseCode := env.HandleCheck(w, r)
+	// if responseCode != http.StatusOK {
+	// 	return
+	// }
 	var c models.Comment
 	err := json.NewDecoder(r.Body).Decode(&c)
 	if err != nil {
@@ -389,10 +389,10 @@ func (env *Env) InsertComment(w http.ResponseWriter, r *http.Request) {
 }
 
 func (env *Env) EditComment(w http.ResponseWriter, r *http.Request) {
-	responseCode := env.HandleCheck(w, r)
-	if responseCode != http.StatusOK {
-		return
-	}
+	// responseCode := env.HandleCheck(w, r)
+	// if responseCode != http.StatusOK {
+	// 	return
+	// }
 	vars := mux.Vars(r)
 	w.WriteHeader(http.StatusOK)
 	fmt.Fprintf(w, "Post Id: %v\n", vars["id"])
@@ -406,10 +406,10 @@ func (env *Env) EditComment(w http.ResponseWriter, r *http.Request) {
 }
 
 func (env *Env) DeleteComment(w http.ResponseWriter, r *http.Request) {
-	responseCode := env.HandleCheck(w, r)
-	if responseCode != http.StatusOK {
-		return
-	}
+	// responseCode := env.HandleCheck(w, r)
+	// if responseCode != http.StatusOK {
+	// 	return
+	// }
 	vars := mux.Vars(r)
 	w.WriteHeader(http.StatusOK)
 	fmt.Fprintf(w, "Comment Id: %v\n", vars["id"])

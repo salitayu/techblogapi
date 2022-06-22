@@ -25,14 +25,14 @@ type User struct {
 type Category struct {
 	CategoryID   int64  `json:"category_id,omitempty" db:"id"`
 	CategoryName string `json:"category_name" db:"category_name"`
-	Slug string `json:"slug" db:"slug"`
+	Slug         string `json:"slug" db:"slug"`
 }
 
 type Post struct {
 	PostID     int64     `json:"post_id,omitempty" db:"id"`
 	UserID     int64     `json:"user_id" db:"user_id"`
 	CategoryID int64     `json:"category_id" db:"category_id"`
-	Slug	   string    `json:"slug" db:"slug"`
+	Slug       string    `json:"slug" db:"slug"`
 	Title      string    `json:"title" db:"title"`
 	Message    string    `json:"message" db:"message"`
 	ReadTime   int64     `json:"read_time" db:"read_time"`
@@ -111,7 +111,7 @@ func (m BlogModel) AllPosts() ([]Post, error) {
 	var posts []Post
 	for rows.Next() {
 		var post Post
-		err := rows.Scan(&post.PostID, &post.UserID, &post.CategoryID, &post.Title, &post.ReadTime,  &post.DateTime, &post.Message, &post.Slug)
+		err := rows.Scan(&post.PostID, &post.UserID, &post.CategoryID, &post.Title, &post.ReadTime, &post.DateTime, &post.Message, &post.Slug)
 		if err != nil {
 			return nil, err
 		}
@@ -178,7 +178,7 @@ func (m BlogModel) AllPostsByCatSlug(slug string) ([]Post, error) {
 	return posts, nil
 }
 
-func (m BlogModel) PostById(id int)([]Post, error) {
+func (m BlogModel) PostById(id int) ([]Post, error) {
 	rows, err := m.DB.Query("SELECT * FROM post WHERE id = $1", id)
 	if err != nil {
 		return nil, err
@@ -213,10 +213,12 @@ func (m BlogModel) PostBySlug(slug string) ([]Post, error) {
 			return nil, err
 		}
 		posts = append(posts, post)
+		fmt.Println("posts adding ", posts)
 	}
 	if err = rows.Err(); err != nil {
 		return nil, err
 	}
+	fmt.Println("added posts ", posts)
 	return posts, nil
 }
 
