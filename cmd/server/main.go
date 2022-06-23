@@ -63,6 +63,7 @@ func main() {
 	r.HandleFunc("/", env.Handle).Methods("GET")
 	r.HandleFunc("/register", env.Register).Methods("POST")
 	r.HandleFunc("/login", env.Login).Methods("POST")
+	r.HandleFunc("/checkSession", env.Handle).Methods("POST")
 
 	r.HandleFunc("/categories", env.GetCategories).Methods("GET")
 	r.HandleFunc("/categories/id/{id}", env.GetCategoryByID).Methods("GET")
@@ -139,11 +140,10 @@ func (env *Env) HandleCheck(w http.ResponseWriter, r *http.Request) int {
 func (env *Env) Handle(w http.ResponseWriter, r *http.Request) {
 	responseCode := env.HandleCheck(w, r)
 	if responseCode != http.StatusOK {
+		http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
 		return
 	}
-	env.HandleCheck(w, r)
-	welcomeResponse := map[string]string{"message": "Hi, my name is Sally. Welcome to my tech blog :)"}
-	json.NewEncoder(w).Encode(welcomeResponse)
+	json.NewEncoder(w).Encode(map[string]string{"results": "logged in"})
 }
 
 func (env *Env) GetCategories(w http.ResponseWriter, r *http.Request) {
@@ -457,8 +457,8 @@ func (env *Env) Login(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if loginSuccessful {
-		env.cache.CreateSession(w, lc)
-		fmt.Fprintf(w, "Logged in %t", loginSuccessful)
+		sessionToken := env.cache.CreateSession(w, lc)
+		json.NewEncoder(w).Encode(map[string]string{"results": sessionToken})
 	} else {
 		http.SetCookie(w, &http.Cookie{
 			Name:    "session_token",

@@ -39,17 +39,23 @@ func (s Session) isExpired() bool {
 
 func (rc *RedisClient) CheckSession(w http.ResponseWriter, r *http.Request) int {
 	// Get session_token from request cookies
-	c, err := r.Cookie("session_token")
-	fmt.Println("c ", c)
+	// c, err := r.Cookie("session_token")
+	// fmt.Println("c ", c)
+	// if err != nil {
+	// 	if err == http.ErrNoCookie {
+	// 		// check if cookie is not set
+	// 		return http.StatusUnauthorized
+	// 	}
+	// 	return http.StatusBadRequest
+	// }
+	// sessionToken := c.Value
+	// fmt.Println("sessionToken ", sessionToken)
+	sessionToken := ""
+	err := json.NewDecoder(r.Body).Decode(&sessionToken)
 	if err != nil {
-		if err == http.ErrNoCookie {
-			// check if cookie is not set
-			return http.StatusUnauthorized
-		}
-		return http.StatusBadRequest
+		fmt.Fprintf(w, "%s", err)
+		return http.StatusUnauthorized
 	}
-	sessionToken := c.Value
-	fmt.Println("sessionToken ", sessionToken)
 
 	// Check session token from cookie and redis
 	sessionTokenRedis, err := rc.Conn.Get(sessionToken).Result()
@@ -71,7 +77,7 @@ func (rc *RedisClient) CheckSession(w http.ResponseWriter, r *http.Request) int 
 	return http.StatusOK
 }
 
-func (rc *RedisClient) CreateSession(w http.ResponseWriter, lc LoginCredentials) {
+func (rc *RedisClient) CreateSession(w http.ResponseWriter, lc LoginCredentials) string {
 	// Create new random session token using uuid
 	sessionToken := uuid.NewString()
 	fmt.Println("createSessionToken ", sessionToken)
@@ -97,6 +103,7 @@ func (rc *RedisClient) CreateSession(w http.ResponseWriter, lc LoginCredentials)
 		Value:   sessionToken,
 		Expires: expiresAt,
 	})
+	return sessionToken
 }
 
 func (rc *RedisClient) RefreshSession(w http.ResponseWriter, r *http.Request) {
